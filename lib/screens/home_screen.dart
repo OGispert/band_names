@@ -46,12 +46,29 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  ListTile _bandTile(Band band) {
-    return ListTile(
-      leading: CircleAvatar(child: Text(band.name.substring(0, 2))),
-      title: Text(band.name, style: TextStyle(fontSize: 18)),
-      trailing: Text('${band.votes}', style: TextStyle(fontSize: 18)),
-      onTap: () {},
+  Widget _bandTile(Band band) {
+    return Dismissible(
+      key: Key(band.id),
+      direction: DismissDirection.endToStart,
+      background: Container(
+        padding: EdgeInsets.only(right: 8),
+        color: Colors.red,
+        alignment: Alignment.centerRight,
+        child: Text(
+          'Delete',
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+      ),
+      child: ListTile(
+        leading: CircleAvatar(child: Text(band.name.substring(0, 2))),
+        title: Text(band.name, style: TextStyle(fontSize: 18)),
+        trailing: Text('${band.votes}', style: TextStyle(fontSize: 18)),
+        onTap: () {},
+      ),
     );
   }
 
@@ -96,6 +113,7 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           actions: [
             CupertinoDialogAction(
+              isDestructiveAction: true,
               onPressed: () => Navigator.pop(context, 'Cancel'),
               child: const Text('Cancel'),
             ),
@@ -114,6 +132,14 @@ class _HomeScreenState extends State<HomeScreen> {
     if (bandName.isEmpty || bandName.trim().length <= 1) {
       return;
     }
+
+    setState(() {
+      bands.add(
+        Band(id: (bands.length + 1).toString(), name: bandName, votes: 0),
+      );
+    });
+
+    print(bands.last.id);
 
     editingController.clear();
 
