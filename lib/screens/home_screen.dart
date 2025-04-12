@@ -3,7 +3,11 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 
+import 'package:provider/provider.dart';
+
 import 'package:band_names/models/band.dart';
+import 'package:band_names/services/socket_service.dart';
+import 'package:pie_chart/pie_chart.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,28 +17,61 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  final List<Band> bands = [
-    Band(id: '1', name: 'Metallica', votes: 5),
-    Band(id: '2', name: 'Pantera', votes: 2),
-    Band(id: '3', name: 'Sepultura', votes: 3),
-    Band(id: '4', name: 'Slipknot', votes: 1),
-  ];
+  List<Band> bands = [];
 
   final editingController = TextEditingController();
 
   @override
+  void initState() {
+    super.initState();
+    final socketService = Provider.of<SocketService>(context, listen: false);
+
+    socketService.socket.on('allbands', _handleActiveBands);
+  }
+
+  @override
   void dispose() {
+    final socketService = Provider.of<SocketService>(context, listen: false);
+    socketService.socket.off('allbands');
     editingController.dispose();
     super.dispose();
   }
 
+  _handleActiveBands(dynamic payload) {
+    setState(() {
+      bands = (payload as List).map((band) => Band.fromMap(band)).toList();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
+    final socketService = Provider.of<SocketService>(context);
+    final isConnected = socketService.serverState == ServerState.online;
+
     return Scaffold(
-      appBar: AppBar(title: Text('Band Names')),
-      body: ListView.builder(
-        itemCount: bands.length,
-        itemBuilder: (context, index) => _bandTile(bands[index]),
+      appBar: AppBar(
+        title: Text('Band Names'),
+        actions: [
+          Container(
+            padding: EdgeInsets.only(right: 16),
+            child: Icon(
+              isConnected ? Icons.cloud_done_outlined : Icons.cloud_off,
+              color: isConnected ? Colors.blue : Colors.red,
+            ),
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          _graphWidget(),
+          Expanded(
+            child: ListView.builder(
+              itemCount: bands.length,
+              itemBuilder:
+                  (context, index) => _bandTile(bands[index], socketService),
+            ),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton(
         shape: CircleBorder(),
@@ -46,7 +83,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _bandTile(Band band) {
+  Widget _bandTile(Band band, SocketService service) {
     return Dismissible(
       key: Key(band.id),
       direction: DismissDirection.endToStart,
@@ -63,11 +100,16 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ),
+      onDismissed: (direction) {
+        service.socket.emit('deleteband', {'id': band.id});
+      },
       child: ListTile(
         leading: CircleAvatar(child: Text(band.name.substring(0, 2))),
         title: Text(band.name, style: TextStyle(fontSize: 18)),
         trailing: Text('${band.votes}', style: TextStyle(fontSize: 18)),
-        onTap: () {},
+        onTap: () {
+          service.socket.emit('band-vote', {'id': band.id});
+        },
       ),
     );
   }
@@ -133,16 +175,26 @@ class _HomeScreenState extends State<HomeScreen> {
       return;
     }
 
-    setState(() {
-      bands.add(
-        Band(id: (bands.length + 1).toString(), name: bandName, votes: 0),
-      );
-    });
-
-    print(bands.last.id);
+    final socketService = Provider.of<SocketService>(context, listen: false);
+    socketService.socket.emit('addband', {'name': bandName});
 
     editingController.clear();
 
     Navigator.pop(context);
+  }
+
+  Widget _graphWidget() {
+    Map<String, double> dataMap = {"": 0};
+
+    for (Band band in bands) {
+      dataMap.remove("");
+      dataMap.putIfAbsent(band.name, () => band.votes.toDouble());
+    }
+
+    return Container(
+      width: double.infinity,
+      height: 200,
+      child: PieChart(dataMap: dataMap),
+    );
   }
 }
