@@ -16,10 +16,13 @@ class SocketService with ChangeNotifier {
 
   void initConfig() {
     // Dart client
-    _socket = IO.io('http://localhost:3001', {
-      'transports': ['websocket'],
-      'autoConnect': true,
-    });
+    _socket = IO.io(
+      'https://flutter-sockets-bands-bcaf7dadb449.herokuapp.com/',
+      {
+        'transports': ['websocket'],
+        'autoConnect': true,
+      },
+    );
 
     _socket.onConnect((_) {
       _serverState = ServerState.online;
